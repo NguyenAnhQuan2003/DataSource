@@ -1,0 +1,10 @@
+.venv
+
+*.bson
+*.json
+
+*.BIN
+
+*.log
+__pycache__/
+.DS_Store
