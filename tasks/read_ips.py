@@ -1,4 +1,6 @@
 import logging
+import os
+
 import IP2Location
 import json
 import redis
@@ -8,6 +10,8 @@ from config.logging_config import setup_logging
 setup_logging()
 BATCH_SIZE = 100_000
 OUTPUT_DIR = "./output/ip_json_files/"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 def unique_read_ips(limit=None):
     db = connect_mongodb()
     src_col = db[collection_]
