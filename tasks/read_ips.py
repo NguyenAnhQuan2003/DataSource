@@ -16,7 +16,7 @@ def unique_read_ips(limit=None):
     db = connect_mongodb()
     src_col = db[collection_]
     # dst_col = db[collection_ip_data]
-    ip2loc = IP2Location.IP2Location("IP-COUNTRY-REGION-CITY.BIN")
+    ip2loc = IP2Location.IP2Location("/home/decquannguyen/IP-COUNTRY-REGION-CITY.BIN")
     # r = redis.Redis(host="localhost", port=6379, db=0)
     # query = src_col.find({}, {"ip": 1})
     # if limit:
