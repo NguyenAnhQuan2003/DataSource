@@ -1,5 +1,5 @@
 #logging
-address_log = "/Users/nguyenanhquan/Desktop/Project5/logs/app.log"
+address_log = "/home/decquannguyen/DataSource/logs/app.log"
 #DB connects
 user_name = "nguyenanhquan"
 pwd = "17022003"
