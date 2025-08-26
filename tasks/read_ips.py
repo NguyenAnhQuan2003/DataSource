@@ -3,7 +3,6 @@ import os
 
 import IP2Location
 import json
-import redis
 from config.connect import connect_mongodb
 from config.dir import collection_, collection_ip_data
 from config.logging_config import setup_logging
