@@ -1,20 +1,76 @@
 from common.dir import BATCH_SIZE
 from common.logging_config import setup_logging
-from crawler.claim_batch import crawl_product_name, claim_batch
+from crawler.claim_batch import crawl_product_name, claim_batch, crawl_many
 from common.connect import get_mongo_client, MongoConfig, get_collection_name
 import time
+import asyncio
 setup_logging()
 
+# def worker(cfg: MongoConfig, col_name="summary", output_col="products_name"):
+#     client = get_mongo_client(cfg)
+#     col = get_collection_name(client, cfg.db_name, col_name)
+#     crawled_col = get_collection_name(client, cfg.db_name, output_col)
+#     while True:
+#         docs = claim_batch(col, BATCH_SIZE)
+#         if not docs:
+#             print("No more jobs. Worker is idle.")
+#             break
+#
+#         for doc in docs:
+#             if doc["collection"] in [
+#                 "view_product_detail", "select_product_option",
+#                 "select_product_option_quality", "add_to_cart_action",
+#                 "product_detail_recommendation_visible",
+#                 "product_detail_recommendation_noticed"
+#             ]:
+#                 pid = doc.get("product_id") or doc.get("viewing_product_id")
+#                 url = doc.get("current_url")
+#             elif doc["collection"] == "product_view_all_recommend_clicked":
+#                 pid = doc.get("viewing_product_id")
+#                 url = doc.get("referrer_url")
+#             else:
+#                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "failed"}})
+#                 continue
+#
+#             if not pid or not url:
+#                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "failed"}})
+#                 continue
+#
+#             # product_name = crawl_product_name(url)
+#             product_name_dict = asyncio.run(crawl_many([url]))
+#             product_name = product_name_dict.get(url)
+#             if product_name:
+#                 crawled_col.update_one(
+#                     {"product_id": pid},
+#                     {
+#                         "$set": {
+#                             "product_id": pid,
+#                             "product_name": product_name,
+#                             "url": url,
+#                             "source_doc_id": doc["_id"],
+#                         }
+#                     },
+#                     upsert=True
+#                 )
+#                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "done"}})
+#                 print(f"[DONE] {pid} -> {product_name}")
+#             else:
+#                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "failed"}})
+#                 print(f"[FAILED] {pid}")
+#
+#             time.sleep(0.2)
 def worker(cfg: MongoConfig, col_name="summary", output_col="products_name"):
     client = get_mongo_client(cfg)
     col = get_collection_name(client, cfg.db_name, col_name)
     crawled_col = get_collection_name(client, cfg.db_name, output_col)
+
     while True:
         docs = claim_batch(col, BATCH_SIZE)
         if not docs:
             print("No more jobs. Worker is idle.")
             break
 
+        url_map = {}
         for doc in docs:
             if doc["collection"] in [
                 "view_product_detail", "select_product_option",
@@ -31,12 +87,17 @@ def worker(cfg: MongoConfig, col_name="summary", output_col="products_name"):
                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "failed"}})
                 continue
 
-            if not pid or not url:
+            if pid and url:
+                url_map[url] = (pid, doc)
+            else:
                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "failed"}})
-                continue
 
-            product_name = crawl_product_name(url)
+        # 🚀 Crawl toàn bộ batch URL 1 lần bằng async
+        product_name_dict = asyncio.run(crawl_many(list(url_map.keys())))
 
+        # Lưu kết quả
+        for url, (pid, doc) in url_map.items():
+            product_name = product_name_dict.get(url)
             if product_name:
                 crawled_col.update_one(
                     {"product_id": pid},
@@ -56,4 +117,4 @@ def worker(cfg: MongoConfig, col_name="summary", output_col="products_name"):
                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "failed"}})
                 print(f"[FAILED] {pid}")
 
-            time.sleep(0.2)
+        time.sleep(0.2)
