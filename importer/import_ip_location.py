@@ -1,5 +1,5 @@
 import subprocess
-from config.dir import uri
+from common.dir import uri
 def import_ip_location(jsonl_file, db_name, collection_name):
     cmd = [
         "mongoimport",

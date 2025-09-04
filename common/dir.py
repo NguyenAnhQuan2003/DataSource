@@ -12,3 +12,4 @@ collection_ = "summary"
 collection_ip_data = "ip_location"
 #output file
 dir_out = "/home/decquannguyen/DataSource/output/ip_json_files"
+dir_export = "/home/decquannguyen/DataSource/output/csv_files"

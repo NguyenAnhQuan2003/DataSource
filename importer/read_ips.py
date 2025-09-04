@@ -3,16 +3,17 @@ import os
 
 import IP2Location
 import json
-from config.connect import connect_mongodb
-from config.dir import collection_, collection_ip_data
-from config.logging_config import setup_logging
+from common.connect import get_mongo_client, MongoConfig
+from common.dir import collection_
+from common.logging_config import setup_logging
 setup_logging()
 BATCH_SIZE = 100_000
 OUTPUT_DIR = "./output/ip_json_files/"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def unique_read_ips(limit=None):
-    db = connect_mongodb()
+def unique_read_ips(cfg: MongoConfig,limit=None):
+    client = get_mongo_client(cfg)
+    db = client[cfg.db_name]
     src_col = db[collection_]
     ip2loc = IP2Location.IP2Location("/home/decquannguyen/IP-COUNTRY-REGION-CITY.BIN")
     pipeline = [
