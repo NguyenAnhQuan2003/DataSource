@@ -5,10 +5,10 @@ from common.connect import get_mongo_client, MongoConfig, get_collection_name
 import time
 setup_logging()
 
-def worker(cfg: MongoConfig, col_name="summary"):
+def worker(cfg: MongoConfig, col_name="summary", output_col="products_name"):
     client = get_mongo_client(cfg)
     col = get_collection_name(client, cfg.db_name, col_name)
-
+    crawled_col = get_collection_name(client, cfg.db_name, output_col)
     while True:
         docs = claim_batch(col, BATCH_SIZE)
         if not docs:
@@ -38,11 +38,19 @@ def worker(cfg: MongoConfig, col_name="summary"):
             product_name = crawl_product_name(url)
 
             if product_name:
-                col.update_one(
-                    {"_id": doc["_id"]},
-                    {"$set": {"status": "done", "product_id": pid,
-                              "product_name": product_name, "url": url}}
+                crawled_col.update_one(
+                    {"product_id": pid},
+                    {
+                        "$set": {
+                            "product_id": pid,
+                            "product_name": product_name,
+                            "url": url,
+                            "source_doc_id": doc["_id"],
+                        }
+                    },
+                    upsert=True
                 )
+                col.update_one({"_id": doc["_id"]}, {"$set": {"status": "done"}})
                 print(f"[DONE] {pid} -> {product_name}")
             else:
                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "failed"}})
