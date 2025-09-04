@@ -18,5 +18,8 @@ def get_mongo_client(cfg: MongoConfig) -> MongoClient:
 def get_collection(db, name: str) -> Collection:
     return db[name]
 
+def get_collection_name(client: MongoClient, db_name: str, name: str) -> Collection:
+    return client[db_name][name]
+
 def project_fields(fields: List[str]) -> Dict:
     return {f: 1 for f in fields}
