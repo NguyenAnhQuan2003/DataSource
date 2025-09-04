@@ -4,7 +4,7 @@
 *.json
 
 *.BIN
-
+/Users/nguyenanhquan/Desktop/Project5/common/dir.py
 *.log
 __pycache__/
 .DS_Store
