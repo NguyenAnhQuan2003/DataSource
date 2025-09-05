@@ -1,75 +1,45 @@
 import logging
-import aiohttp
-import asyncio
-import random
 import requests
 from bs4 import BeautifulSoup
 from common.logging_config import setup_logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from common.dir import BATCH_SIZE
 setup_logging()
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 
-# Giới hạn số request song song (ví dụ 200/máy)
-CONCURRENCY = 200
-# Số lần retry tối đa nếu lỗi
-MAX_RETRIES = 3
-
-semaphore = asyncio.Semaphore(CONCURRENCY)
-
-async def fetch(session, url):
-    """Gửi request và lấy HTML"""
-    for attempt in range(MAX_RETRIES):
-        try:
-            async with semaphore:  # giới hạn concurrency
-                async with session.get(url, timeout=10) as resp:
-                    if resp.status != 200:
-                        return None
-                    text = await resp.text()
-                    return text
-        except Exception as e:
-            logging.warning(f"Retry {attempt+1}/{MAX_RETRIES} for {url}: {e}")
-            await asyncio.sleep(1 + attempt)  # backoff
+def crawl_product_name(url):
+    try:
+        resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        if resp.status_code != 200:
+            return None
+        soup = BeautifulSoup(resp.text, "html.parser")
+        title = soup.find("h1")
+        if title:
+            return title.get_text(strip=True)
+    except Exception as e:
+        logging.error(f"Crawling error: {e} - URL: {url}")
     return None
 
-# def crawl_product_name(url):
-#     try:
-#         resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-#         if resp.status_code != 200:
-#             return None
-#         soup = BeautifulSoup(resp.text, "html.parser")
-#         title = soup.find("h1")
-#         if title:
-#             return title.get_text(strip=True)
-#     except Exception as e:
-#         logging.error("Crawling error", e)
-#     return None
+def crawl_batch(batch_docs, max_workers=50):
+    results = []
 
-async def crawl_product_name(session, url):
-    """Parse HTML và lấy <h1>"""
-    html = await fetch(session, url)
-    if not html:
-        return None
-    soup = BeautifulSoup(html, "lxml")
-    title = soup.find("h1")
-    return title.get_text(strip=True) if title else None
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_doc = {executor.submit(crawl_product_name, doc['url']): doc for doc in batch_docs}
 
-async def crawl_many(urls):
-    """Crawl nhiều URL song song"""
-    results = {}
-    async with aiohttp.ClientSession(
-        headers={"User-Agent": "Mozilla/5.0"}
-    ) as session:
-        tasks = [crawl_product_name(session, url) for url in urls]
-        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        for future in as_completed(future_to_doc):
+            doc = future_to_doc[future]
+            try:
+                product_name = future.result()
+                if product_name:
+                    results.append((doc, product_name))
+                else:
+                    results.append((doc, None))
+            except Exception as e:
+                logging.error(f"Thread error: {e}")
+                results.append((doc, None))
 
-        for url, res in zip(urls, responses):
-            if isinstance(res, Exception):
-                logging.error(f"Error with {url}: {res}")
-                results[url] = None
-            else:
-                results[url] = res
     return results
 
 def claim_batch(col, size=BATCH_SIZE):
@@ -79,4 +49,3 @@ def claim_batch(col, size=BATCH_SIZE):
     if ids:
         col.update_many({"_id": {"$in": ids}}, {"$set": {"status": "processing"}})
     return docs
-
