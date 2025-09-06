@@ -1,5 +1,7 @@
 import logging
 import requests
+from datetime import datetime
+from pymongo import ReturnDocument
 from bs4 import BeautifulSoup
 from common.logging_config import setup_logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -43,20 +45,19 @@ def crawl_batch(batch_docs, max_workers=50):
     return results
 
 def claim_batch(col, size=BATCH_SIZE):
-    # docs = list(col.find({"status": "pending"})
-    #                .limit(size))
-    # ids = [d["_id"] for d in docs]
-    # if ids:
-    #     col.update_many({"_id": {"$in": ids}}, {"$set": {"status": "processing"}})
-    # return docs
     docs = []
     for _ in range(size):
         doc = col.find_one_and_update(
             {"status": "pending"},
-            {"$set": {"status": "processing"}},
-            sort=[("_id", 1)]
+            {"$set": {
+                "status": "processing",
+                "updated_at": datetime.utcnow()
+            }},
+            sort=[("_id", 1)],
+            return_document=ReturnDocument.AFTER
         )
         if not doc:
             break
+        print(f"[CLAIMED] _id={doc['_id']} | status={doc.get('status')}")
         docs.append(doc)
     return docs
