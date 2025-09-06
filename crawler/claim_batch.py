@@ -43,9 +43,20 @@ def crawl_batch(batch_docs, max_workers=50):
     return results
 
 def claim_batch(col, size=BATCH_SIZE):
-    docs = list(col.find({"status": "pending"})
-                   .limit(size))
-    ids = [d["_id"] for d in docs]
-    if ids:
-        col.update_many({"_id": {"$in": ids}}, {"$set": {"status": "processing"}})
+    # docs = list(col.find({"status": "pending"})
+    #                .limit(size))
+    # ids = [d["_id"] for d in docs]
+    # if ids:
+    #     col.update_many({"_id": {"$in": ids}}, {"$set": {"status": "processing"}})
+    # return docs
+    docs = []
+    for _ in range(size):
+        doc = col.find_one_and_update(
+            {"status": "pending"},
+            {"$set": {"status": "processing"}},
+            sort=[("_id", 1)]
+        )
+        if not doc:
+            break
+        docs.append(doc)
     return docs

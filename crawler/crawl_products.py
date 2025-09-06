@@ -7,7 +7,7 @@ from common.connect import get_mongo_client, MongoConfig, get_collection_name
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 setup_logging()
-max_workers = 50
+max_workers = 160
 def worker(cfg: MongoConfig, col_name="summary", output_col="products_name"):
     client = get_mongo_client(cfg)
     col = get_collection_name(client, cfg.db_name, col_name)
@@ -53,8 +53,8 @@ def worker(cfg: MongoConfig, col_name="summary", output_col="products_name"):
                     product_name = future.result()  # crawl_product_name trả về string
                     results[url] = product_name
                 except Exception as e:
-                    logging.error(f"Crawl failed for {url}: {e}")
-                    results[url] = None
+                    msg = f"[FAILED] URL: {url} | Error: {e}"
+                    print(msg)
                     results[url] = None
 
         for url, (pid, doc) in url_map.items():
@@ -73,6 +73,6 @@ def worker(cfg: MongoConfig, col_name="summary", output_col="products_name"):
                     upsert=True
                 )
                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "done"}})
-                logging.info(f"[DONE] Product_id: {pid} | Name: {product_name}")
+                print(f"[DONE] Product_id: {pid} | Name: {product_name}")
             else:
                 col.update_one({"_id": doc["_id"]}, {"$set": {"status": "failed"}})
